@@ -1,0 +1,164 @@
+# IRC
+
+Sprich mit Gladys über [IRC](https://de.wikipedia.org/wiki/Internet_Relay_Chat) (Libera.Chat, OFTC, dein
+eigener Server…), mit jedem IRC-Client (WeeChat, irssi, HexChat, The Lounge, Quassel, Goguma…), so wie mit
+dem Telegram-Bot von Gladys: Stell eine Frage, starte eine Szene, empfange die Nachrichten von Gladys. Die
+Integration schreibt aus deinen Szenen auch an Nicknames und in Kanäle und startet Szenen, wenn eine
+Nachricht oder ein Befehl wie `!licht aus` in einem Kanal des Bots geschrieben wird.
+
+> **Developed without the hardware: feedback welcome.** Ohne die Hardware entwickelt: Rückmeldungen sind
+> willkommen. Die Integration wurde mit einem echten Ergo-IRC-Server getestet (TLS, SASL, Kanäle,
+> Wiederverbindung), aber nicht in einem echten Gladys und nicht in jedem Netzwerk. Schreib, was geht und was
+> nicht, in die [Issues](https://github.com/guim31/gladys-irc/issues) oder ins
+> [Gladys-Forum](https://community.gladysassistant.com).
+
+## Was du brauchst
+
+- Gladys Assistant **5.1.0** oder neuer.
+- Einen IRC-Server, den Gladys erreicht: ein öffentliches Netzwerk (Libera.Chat, OFTC…), deinen eigenen
+  Server (Ergo, InspIRCd, UnrealIRCd…) oder einen Bouncer (ZNC).
+- Einen **für den Bot registrierten Nickname** bei NickServ (`/msg NickServ REGISTER <Passwort> <E-Mail>` in
+  den meisten Netzwerken), damit niemand anderes ihn nimmt und der Bot sich per SASL anmeldet. Auf deinem
+  eigenen Server ohne Dienste ist kein Passwort nötig.
+- Das **Dienste-Konto** jeder Person, die mit dem Bot sprechen darf (ihr registrierter Nickname, z. B.
+  `alice`): Der Bot vertraut einer Person nur, wenn der Server meldet, dass sie mit diesem Konto angemeldet
+  ist. Ohne Dienste geht auch eine **Hostmaske** wie `alice!*@zuhause.example.org`.
+
+## Einrichtung
+
+1. Registriere den Nickname des Bots in deinem Netzwerk (melde dich einmal mit einem IRC-Client unter diesem
+   Nickname an, dann `/msg NickServ REGISTER …`; Libera.Chat verlangt eine Bestätigung per E-Mail).
+2. In Gladys, **Integrationen → IRC → Konfiguration**:
+   - **Server**: ein Hostname, bei Bedarf mit Port: `irc.libera.chat`, `irc.example.org:6697`,
+     `192.168.1.20:6667` oder `ircs://irc.oftc.net`. Ohne Port: 6697 mit TLS, 6667 ohne.
+   - **Verschlüsselte Verbindung (TLS)**: standardmäßig an; lass sie an. Ohne TLS wird nie ein Passwort
+     gesendet.
+   - **Selbstsigniertes Zertifikat akzeptieren**: nur für deinen eigenen Server im lokalen Netz, dessen
+     Zertifikat nicht von einer Stelle signiert ist (Ergo erstellt so ein Zertifikat). Die Verbindung bleibt
+     verschlüsselt, aber der Server wird nicht geprüft. Standardmäßig aus.
+   - **Nickname des Bots**: standardmäßig `Gladys`. Ist er vergeben, versucht der Bot `Gladys_`, dann
+     `Gladys__`.
+   - **Authentifizierung**: **SASL** (die meisten Netzwerke: Libera.Chat, OFTC, Ergo…), **NickServ** (der Bot
+     sendet `IDENTIFY` nach der Anmeldung: ältere Netzwerke), **Server-Passwort** (ein Bouncer wie ZNC oder
+     ein privater Server) oder **Keine Authentifizierung**.
+   - **Konto (optional)**: das Dienste-Konto des Bots, falls es nicht sein Nickname ist. Für ZNC:
+     `benutzer/netzwerk`.
+   - **Passwort**: das Passwort des Kontos (oder des Servers). Wird nie in die Protokolle geschrieben.
+   - **Kanäle**: die Kanäle, denen der Bot beitritt, z. B. `#zuhause, #alarme`, durch Kommas getrennt. Deren
+     Nachrichten starten Szenen.
+   - **Erlaubte Personen**: die Dienste-Konten (`alice`) oder Hostmasken (`alice!*@zuhause.example.org`, `*`
+     und `?` erlaubt), auf die der Bot hört, durch Kommas getrennt. **Nie ein bloßer Nickname**: Jeder kann
+     einen freien Nickname nehmen. **Leer antwortet der Bot niemandem.**
+   - **Befehlspräfix**: standardmäßig `!`.
+   - **Sprache des Bots**: die Sprache dessen, was der Bot schreibt, bevor eine Person verknüpft ist.
+3. Klicke auf **Verbindung testen**: Der Bericht nennt den Server und den Nickname des Bots, die betretenen
+   Kanäle und die Zahl der erlaubten Personen. Der Verbindungsstatus der Seite zeigt es auch.
+
+### Dein IRC-Konto verknüpfen, um mit Gladys zu sprechen
+
+Jede Gladys-Person, die über IRC mit Gladys sprechen will, macht das einmal:
+
+1. Melde dich wie gewohnt mit deinem Konto im Netzwerk an (SASL oder NickServ), damit der Bot dich erkennt.
+2. In Gladys, **Integrationen → IRC → Konfiguration**, Block „Mein Konto verknüpfen“: Klicke auf
+   **Verknüpfungscode generieren**.
+3. Schick den Code (8 Zeichen) dem Bot als private Nachricht: `/msg Gladys ABCD2345`. Der Bot bestätigt: Dein
+   Konto ist mit deinem Gladys-Benutzer verknüpft. Im selben Block kannst du die Verknüpfung lösen.
+
+## Was der Bot macht
+
+- **Im privaten Gespräch** (`/msg Gladys …` oder `/query Gladys`): Er gibt deine Nachrichten mit den Rechten
+  des verknüpften Gladys-Benutzers an Gladys weiter, genau wie der Telegram-Bot: „Wie warm ist es im
+  Wohnzimmer?“, „Mach das Licht aus“. Die Antworten von Gladys kommen dort zurück, ebenso die Nachrichten, die
+  Gladys dir schickt (Szenenaktion **Nachricht senden**, Systemnachrichten).
+- **Wer eine Antwort bekommt**: Der Bot schreibt an den Nickname, unter dem er dich zuletzt gesehen hat, und
+  prüft vorher per WHOIS, dass dieser Nickname noch du bist (dein Konto oder deine Hostmaske). Bist du nicht
+  verbunden oder gehört der Nickname jetzt jemand anderem, wird nichts Privates gesendet.
+- **In einem Kanal**: Jede Nachricht einer erlaubten Person startet den Auslöser **IRC-Nachricht
+  empfangen**, und eine Nachricht, die mit dem Präfix beginnt, startet auch **IRC-Befehl empfangen**. Der Bot
+  antwortet dort nie von selbst, wo andere mitlesen: Was passiert, bestimmen deine Szenen.
+- **Was er ignoriert**: alle, die keine erlaubte Person sind, seine eigenen Nachrichten, den von einem
+  Bouncer wiedergegebenen Verlauf, Nachrichten, die beim Empfang älter als 5 Minuten sind (ein „!garage auf“
+  von vor zwei Stunden läuft jetzt nicht), und Kanäle, in die er gezwungen wurde (er verlässt sie).
+- **Lange Nachrichten**: Eine IRC-Zeile fasst etwa 400 Bytes; eine längere Nachricht wird zwischen Wörtern
+  geteilt, und jeder Zeilenumbruch des Textes beginnt eine neue Zeile, höchstens 10 Zeilen. Damit der Bot
+  nicht wegen Flooding hinausgeworfen wird, sendet er 4 Zeilen auf einmal, dann eine Zeile alle 2 Sekunden.
+- **Verbindung**: Bricht sie ab, verbindet sich der Bot selbst neu (nach 2, 5, 10, 30, dann 60 Sekunden) und
+  betritt seine Kanäle wieder. Ein voller Kanal oder einer ohne Antwort wird alle 2 Minuten erneut versucht;
+  nach einem Kick bleibt der Bot draußen bis zum nächsten Neustart oder zur nächsten Konfigurationsänderung.
+
+## Dashboard
+
+Das Widget **IRC** zeigt, ob der Bot verbunden ist, seinen Nickname, die Kanäle, in denen er ist, die letzten
+5 Nachrichten erlaubter Personen in den Kanälen (Nickname, Text, Datum) und eine Schaltfläche **Verbindung
+testen**. Zwei Einstellungen blenden die Nachrichten und die Schaltfläche aus. Die privaten Gespräche mit
+Gladys erscheinen nie: Alle, die das Dashboard sehen, sehen das Widget.
+
+## Szenen
+
+### Auslöser
+
+- **IRC-Nachricht empfangen**: Eine erlaubte Person hat in einem Kanal des Bots geschrieben. Filter (leer =
+  alle): **Kanal** (`#zuhause`) und **Absender** (das Konto oder die Hostmaske wie bei den erlaubten Personen
+  eingetragen, `alice`). Variablen: Nachricht, Absender, Nickname, Kanal.
+- **IRC-Befehl empfangen**: Eine erlaubte Person hat einen Befehl in einen Kanal geschrieben: das Präfix,
+  dann ein Wort, dann optionale Argumente, z. B. `!licht aus küche`. Filter **Befehl**: das Wort **ohne
+  Präfix, kleingeschrieben** (`licht`); dazu Kanal, Absender. Variablen: Befehl (`licht`), Argumente (`aus
+küche`), Nachricht, Absender, Nickname, Kanal. Dieselbe Nachricht startet auch **IRC-Nachricht empfangen**.
+- **IRC-Verbindung verloren**: Der Bot erreicht den Server nicht mehr, seit einer Minute, oder sein Passwort
+  oder das Zertifikat des Servers werden abgelehnt. Variable: Fehler. Einmal gestartet, bis die Verbindung
+  zurück ist.
+- **IRC-Verbindung wiederhergestellt**: Der Bot erreicht den Server nach einem Verbindungsverlust wieder.
+  Variable: Nickname des Bots.
+
+### Aktionen
+
+- **IRC-Nachricht senden**: schreibt eine Nachricht an einen Nickname (`alice`) oder in einen Kanal, in dem
+  der Bot ist (`#zuhause`). Die Nachricht nimmt Szenenvariablen an. Ergebnisse: Gesendet (ja/nein), Fehler.
+  Eine fehlgeschlagene Nachricht hält die Szene nicht an: Prüf **Gesendet** bei Bedarf mit einer Bedingung.
+
+Um einer Gladys-Person statt einem Nickname zu schreiben, nimm die Aktion **Nachricht senden** von Gladys:
+Diese erreicht das verknüpfte IRC-Konto, nach der WHOIS-Prüfung.
+
+### Szenenideen
+
+- **Garage per Befehl**: Auslöser **IRC-Befehl empfangen**, Befehl `garage`, Kanal `#zuhause`; dann eine
+  Bedingung auf die Variable Argumente gleich `zu` und die Aktion, die die Garage schließt.
+- **Waschmaschine fertig**: Auslöser auf die Leistung der Steckdose, dann **IRC-Nachricht senden** an
+  `#zuhause`: „Die Waschmaschine ist fertig“.
+- **Alarm, wenn der Bot getrennt ist**: Auslöser **IRC-Verbindung verloren**, dann eine Benachrichtigung über
+  einen anderen Kanal (Gotify, ntfy, SMS) mit der Variable Fehler.
+
+## Fehlerbehebung
+
+- **„der IRC-Server antwortet nicht“**: Prüf Host und Port. Die meisten Netzwerke bieten TLS auf 6697;
+  `TLS auf einem Klartext-Port?` heißt, dass TLS mit einem Port ohne TLS gesprochen wurde (oft 6667).
+- **„Zertifikat des Servers abgelehnt“**: Das Zertifikat ist selbstsigniert, abgelaufen oder nennt den
+  eingegebenen Host nicht (nimm bei einem öffentlichen Netzwerk den Namen, nicht die IP-Adresse). Für deinen
+  eigenen Server im lokalen Netz: Hak **Selbstsigniertes Zertifikat akzeptieren** an.
+- **„Konto oder Passwort abgelehnt“**: Prüf sie, indem du dich mit einem IRC-Client anmeldest. Das Konto ist
+  der registrierte Nickname oder **Konto (optional)**, falls abweichend.
+- **„der Server bietet kein SASL an“**: Wähle **NickServ** bei **Authentifizierung**.
+- **„der Bot ist in diesem Netzwerk gesperrt“**: Manche Netzwerke lehnen Verbindungen mancher Hoster ab oder
+  verlangen von solchen Adressen SASL; sieh dir die Regeln des Netzwerks an.
+- **Ein Kanal wird nicht betreten**: Status der Seite und Test nennen ihn, mit dem Grund (nur auf Einladung,
+  gesperrt, Schlüssel nötig, voll). Kanäle mit Schlüssel (+k) werden nicht unterstützt: Lade den Bot ein oder
+  setz ihn auf die Zugangsliste des Kanals.
+- **Der Bot antwortet mir nicht**: Bist du mit deinem Konto angemeldet (`/whois deinnick` zeigt „is logged in
+  as“)? Steht dein Konto genau so bei **Erlaubte Personen**? Ist es verknüpft (sonst schickt dir der Bot die
+  Anleitung)?
+- **Eine Kanalnachricht startet die Szene nicht**: Der Server muss dem Bot sagen, wer angemeldet ist (IRCv3-
+  Fähigkeit `account-tag`: Libera.Chat, OFTC, Ergo, InspIRCd und UnrealIRCd haben sie); sonst nimm eine
+  Hostmaske. Der Filter Befehl ist das Wort ohne Präfix, kleingeschrieben: `licht`, nicht `!Licht`.
+- Mehr Details in den Protokollen der Integration mit `LOG_LEVEL=debug`.
+
+## Grenzen
+
+- **Keine Ende-zu-Ende-Verschlüsselung**: Die Nachrichten laufen verschlüsselt zwischen deinem Client, dem
+  Server und Gladys (TLS), aber der IRC-Server und seine Betreiber können sie lesen, ebenso alle in einem
+  Kanal. Halte Geheimnisse aus den Kanälen heraus.
+- Eine mit Gladys verknüpfte Person kann über IRC alles tun, was ihr Gladys-Benutzer darf: Halte die Liste der
+  erlaubten Personen kurz, schütze die Konten mit starken Passwörtern und nimm lieber Konten als Hostmasken.
+- Von Gladys gesendete Bilder (Kamerabilder) werden nicht weitergeleitet: Nur der Text wird gesendet. Dateien
+  und DCC werden ignoriert.
+- Ein Bot pro Gladys und pro Netzwerk. Kanäle mit Schlüssel werden nicht unterstützt.
+- Mit keinem IRC-Netzwerk verbunden.

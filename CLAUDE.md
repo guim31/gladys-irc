@@ -32,15 +32,20 @@ pushing.
 
 ```
 index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
-src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
+src/app.js                        the integration: session loop, channels, linking, triggers,
+                                  scene action, onSendMessage (WHOIS check), widget, test action
+src/irc/connection.js             one session over irc-framework (no built-in reconnect, SASL
+                                  failure ends it, flood-controlled send queue, PING, WHOIS)
+src/irc/split.js                  cutting a text into IRC lines (UTF-8 bytes, between words)
+src/irc/errors.js                 typed errors (IrcError.kind), transient or not
 src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
-gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
-test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
+src/texts.js                      four-language texts outside the widget (status, report, bot)
+src/widgets.js                    the "irc" dashboard widget
+src/store.js, src/log.js          /data persistence (atomic writes), one-line repeated failures
+gladys-assistant-integration.json manifest: communication type, receive: true, triggers, action...
+docs/{en,fr,de,es}.md             user documentation, re-hosted by Gladys (mandatory)
+test/                             node --test, fake Gladys of the SDK + fake IRC server
+test/live.test.js                 end to end against a real Ergo, skipped without IRC_LIVE_SERVER
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
 
@@ -259,3 +264,23 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - Docs `en`, `fr`, `de`, `es` avec les mêmes sections.
 - Chauffe, ouverture, sécurité : ne rien rendre pilotable « comme un thermostat » ou par un assistant
   vocal quand une erreur serait dangereuse (leçon d'OctoPrint).
+
+## IRC (cette intégration)
+
+- Type `communication` (`messaging.receive: true`) : **pas d'appareil** possible (pas d'écran Appareils pour
+  ce type, spec `communication-type.md`) ; l'état de la connexion passe par `setConnectionStatus`, le widget et
+  les déclencheurs `connection_lost` / `connection_restored`, comme gladys-xmpp.
+- **Identité** : un pseudo IRC ne prouve rien. Une personne autorisée est un compte de services, lu sur le tag
+  IRCv3 `account` de chaque message (irc-framework demande `account-tag`), ou un masque `nick!user@host`.
+  `contact_id` Gladys = l'entrée de la liste (compte ou masque, en minuscules IRC). Avant une réponse privée,
+  WHOIS du dernier pseudo vu (cache 60 s) : rien ne part vers un pseudo passé à quelqu'un d'autre.
+- **irc-framework** (MIT, 4.14) : `auto_reconnect: false` (la boucle de `src/app.js` s'en charge),
+  `sasl_disconnect_on_fail: true` (sinon il continue l'enregistrement après un SASL refusé), le pseudo réel est
+  celui de l'événement `registered` (`client.user.nick` reste le pseudo demandé après un 433). Les lignes partent
+  par `connection.write('PRIVMSG cible :texte')`, toujours en forme « trailing » (un texte qui commence par « : »
+  reste intact) ; les cibles venant d'une scène sont validées (pas d'espace ni de CR/LF : injection de commande).
+- Anti-flood : 4 lignes d'un coup puis une toutes les 2 s, 40 lignes en attente au plus (au-delà : erreur
+  `flood`) ; un message est coupé à 400 octets UTF-8 (moins si la cible est longue) entre les mots, 10 lignes au
+  plus.
+- Ergo (`ghcr.io/ergochat/ergo:stable`) crée un certificat auto-signé sur 6697 et accepte
+  `NickServ REGISTER <mdp>` sans e-mail : c'est le serveur des tests réels (`test/live.test.js`).
