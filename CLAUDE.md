@@ -273,7 +273,7 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - **Identité** : un pseudo IRC ne prouve rien. Une personne autorisée est un compte de services, lu sur le tag
   IRCv3 `account` de chaque message (irc-framework demande `account-tag`), ou un masque `nick!user@host`.
   `contact_id` Gladys = l'entrée de la liste (compte ou masque, en minuscules IRC). Avant une réponse privée,
-  WHOIS du dernier pseudo vu (cache 60 s) : rien ne part vers un pseudo passé à quelqu'un d'autre.
+  WHOIS du dernier pseudo vu (cache 5 s : QUIT et NICK n'arrivent au robot que par un salon commun) : rien ne part vers un pseudo passé à quelqu'un d'autre.
 - **irc-framework** (MIT, 4.14) : `auto_reconnect: false` (la boucle de `src/app.js` s'en charge),
   `sasl_disconnect_on_fail: true` (sinon il continue l'enregistrement après un SASL refusé), le pseudo réel est
   celui de l'événement `registered` (`client.user.nick` reste le pseudo demandé après un 433). Les lignes partent

@@ -73,8 +73,10 @@ export const RECENT_KEPT = 5;
 export const MESSAGE_TIMEOUT_MS = 4500;
 // How long a message of Gladys waits for the first connection, within that deadline.
 export const CONNECT_WAIT_MS = 1500;
-// A WHOIS proving a nickname is still the allowed person is trusted this long.
-export const IDENTITY_TTL_MS = 60 * 1000;
+// A nickname proven to be an allowed person (a message, a WHOIS) is trusted this
+// long: enough for the answer to a question, too short for someone to take the
+// nickname over (QUIT and NICK only reach the bot through a shared channel).
+export const IDENTITY_TTL_MS = 5000;
 // Join errors worth a new attempt at the next ping.
 const TRANSIENT_JOIN_ERRORS = new Set(['timeout', 'channel_is_full', 'too_many_channels', 'part']);
 // Gladys link codes: 8 characters of an alphabet without 0/O/1/I/L.
