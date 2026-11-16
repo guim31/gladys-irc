@@ -196,18 +196,43 @@ export class IrcSession extends EventEmitter {
     });
   }
 
-  /** NickServ IDENTIFY after registration; true once the server confirms (900). */
+  /**
+   * NickServ IDENTIFY after registration; true once the server confirms it.
+   * Networks confirm differently: RPL_LOGGEDIN (900, Atheme), an ACCOUNT line
+   * (account-notify, Ergo), or only a NOTICE of NickServ (Anope, OFTC).
+   */
   identify(account, password) {
+    const client = this.client;
     return new Promise((resolve) => {
       const timer = setTimeout(() => finish(false), NICKSERV_TIMEOUT_MS);
       const onLogin = () => finish(true);
+      const onAccount = (event) => {
+        if (event.account && ircLower(event.nick ?? '') === ircLower(this.nick)) {
+          finish(true);
+        }
+      };
+      const onNotice = (event) => {
+        if (ircLower(event.nick ?? '') !== 'nickserv') {
+          return;
+        }
+        const text = String(event.message ?? '');
+        if (/invalid|incorrect|denied|failed|not registered|wrong/i.test(text)) {
+          finish(false);
+        } else if (/identified|logged in|recognized/i.test(text)) {
+          finish(true);
+        }
+      };
       const finish = (ok) => {
         clearTimeout(timer);
-        this.client.removeListener('loggedin', onLogin);
+        client.removeListener('loggedin', onLogin);
+        client.removeListener('account', onAccount);
+        client.removeListener('notice', onNotice);
         resolve(ok);
       };
-      this.client.on('loggedin', onLogin);
-      this.client.raw('PRIVMSG', 'NickServ', `IDENTIFY ${account} ${password}`);
+      client.on('loggedin', onLogin);
+      client.on('account', onAccount);
+      client.on('notice', onNotice);
+      client.raw('PRIVMSG', 'NickServ', `IDENTIFY ${account} ${password}`);
     });
   }
 

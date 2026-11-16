@@ -261,3 +261,29 @@ test('session: flood control sends a burst, then one line every 2 s', async (t) 
   irc.close(null);
   await assert.rejects(irc.say('#maison', 'late'), (err) => err.kind === ERROR_KINDS.UNREACHABLE);
 });
+
+test('session: NickServ confirmed by a NOTICE or an ACCOUNT line, refused by a NOTICE', async () => {
+  const plays = [
+    [
+      (c) => c.emit('notice', { nick: 'NickServ', message: 'You are now identified for gladys.' }),
+      true,
+    ],
+    [(c) => c.emit('account', { nick: 'Gladys', account: 'gladys' }), true],
+    [(c) => c.emit('notice', { nick: 'NickServ', message: 'Invalid password for gladys.' }), false],
+    [(c) => c.emit('notice', { nick: 'mallory', message: 'You are now identified' }), null],
+  ];
+  for (const [play, expected] of plays) {
+    const { client, session: irc } = session({ ...OPTIONS, auth: 'nickserv' });
+    const started = irc.start();
+    client.emit('registered', { nick: 'Gladys' });
+    await new Promise((resolve) => setImmediate(resolve));
+    play(client);
+    if (expected === null) {
+      // Not NickServ: still waiting; the real NickServ answers afterwards.
+      client.emit('loggedin', { account: 'gladys' });
+    }
+    await started;
+    assert.equal(irc.identified, expected ?? true);
+    irc.close(null);
+  }
+});
