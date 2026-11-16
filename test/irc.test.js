@@ -262,6 +262,18 @@ test('session: flood control sends a burst, then one line every 2 s', async (t) 
   await assert.rejects(irc.say('#maison', 'late'), (err) => err.kind === ERROR_KINDS.UNREACHABLE);
 });
 
+test('session: ZNC gets account:password as the server password', () => {
+  const { client, session: irc } = session({
+    ...OPTIONS,
+    auth: 'server_password',
+    account: 'alice/libera',
+  });
+  irc.start().catch(() => {});
+  assert.equal(client.options.password, 'alice/libera:robot-pass-123');
+  assert.equal(client.options.account, undefined);
+  irc.close(null);
+});
+
 test('session: NickServ confirmed by a NOTICE or an ACCOUNT line, refused by a NOTICE', async () => {
   const plays = [
     [

@@ -84,7 +84,7 @@ Jede Gladys-Person, die über IRC mit Gladys sprechen will, macht das einmal:
   nicht wegen Flooding hinausgeworfen wird, sendet er 4 Zeilen auf einmal, dann eine Zeile alle 2 Sekunden.
 - **Verbindung**: Bricht sie ab, verbindet sich der Bot selbst neu (nach 2, 5, 10, 30, dann 60 Sekunden) und
   betritt seine Kanäle wieder. Ein voller Kanal oder einer ohne Antwort wird alle 2 Minuten erneut versucht;
-  nach einem Kick bleibt der Bot draußen bis zum nächsten Neustart oder zur nächsten Konfigurationsänderung.
+  nach einem Kick bleibt der Bot draußen bis zur nächsten Wiederverbindung oder Konfigurationsänderung.
 
 ## Dashboard
 
@@ -114,7 +114,8 @@ küche`), Nachricht, Absender, Nickname, Kanal. Dieselbe Nachricht startet auch 
 
 - **IRC-Nachricht senden**: schreibt eine Nachricht an einen Nickname (`alice`) oder in einen Kanal, in dem
   der Bot ist (`#zuhause`). Die Nachricht nimmt Szenenvariablen an. Ergebnisse: Gesendet (ja/nein), Fehler.
-  Eine fehlgeschlagene Nachricht hält die Szene nicht an: Prüf **Gesendet** bei Bedarf mit einer Bedingung.
+  Eine fehlgeschlagene Nachricht hält die Szene nicht an: Prüf **Gesendet** bei Bedarf mit einer Bedingung. Ein
+  Nickname wird nicht geprüft: Wer ihn hat, bekommt die Nachricht, schick so also nichts Privates.
 
 Um einer Gladys-Person statt einem Nickname zu schreiben, nimm die Aktion **Nachricht senden** von Gladys:
 Diese erreicht das verknüpfte IRC-Konto, nach der WHOIS-Prüfung.

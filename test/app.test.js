@@ -20,7 +20,7 @@ import {
   parseCommand,
 } from '../src/app.js';
 import { normalizeConfig } from '../src/config.js';
-import { ERROR_KINDS } from '../src/irc/errors.js';
+import { ERROR_KINDS, IrcError } from '../src/irc/errors.js';
 import { WIDGET_KEY } from '../src/widgets.js';
 import {
   ALICE,
@@ -402,11 +402,55 @@ test('parseCommand and findAllowed', () => {
     [
       ['alice', 'account'],
       ['*!*@*.example.org', 'mask'],
-      ['{bot}', 'account'],
+      ['[bot]', 'account'],
     ],
   );
   assert.equal(findAllowed(allowed, { ...MALLORY, account: 'ALICE' })?.id, 'alice');
   assert.equal(findAllowed(allowed, { ...MALLORY, hostname: 'x.example.org' })?.kind, 'mask');
   assert.equal(findAllowed(allowed, { ...MALLORY, hostname: 'example.org.evil' }), null);
-  assert.equal(findAllowed(allowed, { ...MALLORY, account: '{bot}' })?.id, '{bot}');
+  assert.equal(findAllowed(allowed, { ...MALLORY, account: '[Bot]' })?.id, '[bot]');
+  // Ergo tells "[bot]" from "{bot}": a different account, never accepted.
+  assert.equal(findAllowed(allowed, { ...MALLORY, account: '{bot}' }), null);
+});
+
+test('closed right after the registration: never "connected", no trigger flapping', async (t) => {
+  const server = createFakeServer();
+  server.silent.add(CHANNEL);
+  const world = await createWorld({ server, config: { ...BASE_CONFIG } });
+  t.after(() => world.app.stop());
+  server.session.drop(new IrcError(ERROR_KINDS.BANNED, 'K-lined'));
+  await settle();
+  assert.equal(world.app.connection, 'disconnected');
+  assert.deepEqual(world.fake.sceneEvents, []);
+  assert.equal(world.sleeps[0].ms, CREDENTIALS_RETRY_MS);
+  await world.wake();
+  server.session.drop(new IrcError(ERROR_KINDS.BANNED, 'K-lined'));
+  await settle();
+  assert.deepEqual(world.fake.sceneEvents, [], 'neither lost nor restored');
+});
+
+test('a nickname that quit or changed is checked again before a private answer', async (t) => {
+  const world = await connected(t);
+  await world.server.deliver(query(BOB, 'hello'));
+  world.server.session.emit('nick_gone', 'bob');
+  world.server.users.set('bob', { ...MALLORY, nick: 'bob' });
+  const ack = await world.fake.sendMessage(
+    { id: 'bob!*@home.example.org' },
+    { text: 's', file: null },
+  );
+  assert.equal(ack.success, false);
+  assert.equal(world.server.whoisCount, 1);
+  assert.deepEqual(world.server.said, []);
+});
+
+test('Gladys reconnecting with the same configuration keeps the IRC session', async (t) => {
+  const world = await connected(t);
+  world.gladys.emit('connected');
+  await settle();
+  assert.equal(world.server.sessions.length, 1);
+  assert.equal(world.server.sessions[0].closed, false);
+  // Saving the configuration again does restart it (a retry after a fix on the server).
+  await world.fake.configUpdated({ ...BASE_CONFIG });
+  await settle();
+  assert.equal(world.server.sessions.length, 2);
 });

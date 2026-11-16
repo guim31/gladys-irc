@@ -96,8 +96,9 @@ export function parseCommand(text, prefix) {
 
 /** The allowed person a message (or a WHOIS answer) comes from, or null. */
 export function findAllowed(allowed, { nick, ident, hostname, account }) {
-  const mask = ircLower(`${nick}!${ident}@${hostname}`);
-  const login = account ? ircLower(account) : null;
+  // ASCII lower case, as the list (see parseAllowed).
+  const mask = `${nick}!${ident}@${hostname}`.toLowerCase();
+  const login = account ? account.toLowerCase() : null;
   return (
     allowed.find((entry) =>
       entry.kind === 'account' ? login === entry.id : entry.pattern.test(mask),
@@ -155,6 +156,7 @@ export function registerHandlers(gladys, options = {}) {
   let stopped = false;
   let lastStatus = null;
   let lostFired = false; // connection_lost was fired: connection_restored may follow
+  let appliedKey = null; // the normalized configuration the loop runs with
   let applying = Promise.resolve(); // configurations are applied one at a time
   let readyWaiters = []; // onSendMessage calls waiting for the first connection
   const statusLog = createFailureLog(logger, { recovered: 'Connection status published again' });
@@ -235,16 +237,18 @@ export function registerHandlers(gladys, options = {}) {
     const done = new AbortController();
     const onAbort = () => done.abort();
     signal?.addEventListener('abort', onAbort, { once: true });
+    current.once('closed', onAbort);
     try {
       current.join(name);
       await Promise.race([answered, timer(JOIN_TIMEOUT_MS, done.signal)]);
     } finally {
       done.abort();
       signal?.removeEventListener('abort', onAbort);
+      current.off('closed', onAbort);
     }
     if (channel.waiter) {
       channel.waiter = null;
-      if (signal?.aborted) {
+      if (signal?.aborted || current.closed) {
         return;
       }
       channel.failed = 'timeout';
@@ -409,6 +413,8 @@ export function registerHandlers(gladys, options = {}) {
     current.on('joined', (name) => live() && onJoined(name));
     current.on('join_failed', (name, reason) => live() && onJoinFailed(name, reason));
     current.on('left', (name, reason) => live() && onLeft(name, reason));
+    // A nickname that quit or changed may soon belong to someone else.
+    current.on('nick_gone', (nick) => verified.delete(ircLower(nick)));
   }
 
   async function loop(signal) {
@@ -429,6 +435,10 @@ export function registerHandlers(gladys, options = {}) {
         if (signal.aborted) {
           await current.stop();
           return;
+        }
+        if (current.closed) {
+          // Closed right after the registration (a K-line after 001...): never "connected".
+          throw current.closeError ?? new IrcError(ERROR_KINDS.UNREACHABLE, 'Closed');
         }
         failingSince = null;
         attempt = 0;
@@ -622,16 +632,29 @@ export function registerHandlers(gladys, options = {}) {
     running = null;
   }
 
-  function applyConfig(raw) {
+  function applyConfig(raw, reconnected = false) {
     // Serialized: two saves in a row must never leave two sessions running.
-    applying = applying.then(() => doApplyConfig(raw));
+    applying = applying.then(() => doApplyConfig(raw, reconnected));
     return applying;
   }
 
-  async function doApplyConfig(raw) {
+  async function doApplyConfig(raw, reconnected) {
     await loaded;
+    const next = normalizeConfig(raw);
+    const key = JSON.stringify(next);
+    if (reconnected && running && key === appliedKey) {
+      // The SDK reconnected to Gladys, the configuration is the same: keep the
+      // IRC session (no QUIT and rejoin in the channels), publish the status again.
+      if (connection === CONNECTION.CONNECTED) {
+        await publishStatus(true, connectedStatus());
+      } else if (lastError && connection === CONNECTION.DISCONNECTED) {
+        await publishStatus(false, errorTexts(lastError));
+      }
+      return;
+    }
+    appliedKey = key;
     await stopLoop();
-    config = normalizeConfig(raw);
+    config = next;
     session = null;
     lastError = null;
     lostFired = false;
@@ -749,7 +772,7 @@ export function registerHandlers(gladys, options = {}) {
     const raw = typeof fields?.to === 'string' ? fields.to.trim() : '';
     const text = typeof fields?.message === 'string' ? fields.message : '';
     if (text.trim() === '') {
-      throw new Error('IRC: the recipient and the message are required');
+      throw new Error('IRC: the message is empty');
     }
     const to = isChannel(raw) ? parseChannel(raw) : parseNickname(raw);
     try {
@@ -761,7 +784,7 @@ export function registerHandlers(gladys, options = {}) {
         throw new IrcError(ERROR_KINDS.NOT_IN_CHANNEL, 'Not in the channel');
       }
       await current.say(to, text);
-      logger.info(`Scene message sent to ${to}`);
+      logger.debug(`Scene message sent to ${to}`);
       return { sent: true, error: '' };
     } catch (err) {
       logger.warn(`Scene message not sent to ${to ?? raw}: ${err.message}`);
@@ -801,7 +824,7 @@ export function registerHandlers(gladys, options = {}) {
 
   gladys.on('connected', () => {
     lastStatus = null; // a new connection: publish the status again
-    return applyConfig(gladys.config).catch((err) =>
+    return applyConfig(gladys.config, true).catch((err) =>
       logger.error('Cannot apply the configuration', err),
     );
   });

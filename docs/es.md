@@ -81,7 +81,7 @@ Cada usuario de Gladys que quiera hablar con Gladys desde IRC lo hace una vez:
   flood, el bot envía 4 líneas de golpe y luego una línea cada 2 segundos.
 - **Conexión**: si se cae, el bot se reconecta solo (tras 2, 5, 10, 30 y luego 60 segundos) y vuelve a entrar
   en sus canales. Un canal lleno o que no respondió se reintenta cada 2 minutos; tras una expulsión (kick), el
-  bot se queda fuera hasta el siguiente reinicio o cambio de configuración.
+  bot se queda fuera hasta su siguiente reconexión o un cambio de configuración.
 
 ## Panel
 
@@ -110,7 +110,8 @@ ven el panel ven el widget.
 
 - **Enviar un mensaje IRC**: escribe un mensaje a un apodo (`alice`) o en un canal donde está el bot (`#casa`).
   El mensaje admite las variables de escena. Resultados: Enviado (sí/no), Error. Un mensaje fallido no detiene
-  la escena: compruebe **Enviado** con una condición si es necesario.
+  la escena: compruebe **Enviado** con una condición si es necesario. Un apodo no se
+  comprueba: lo recibe quien lo tenga, así que no envíe nada privado de este modo.
 
 Para escribir a un usuario de Gladys en lugar de a un apodo, use la acción **Enviar un mensaje** de Gladys:
 llega a su cuenta IRC vinculada, tras la comprobación por WHOIS.

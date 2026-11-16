@@ -84,8 +84,8 @@ Chaque utilisateur de Gladys qui veut lui parler depuis IRC le fait une fois :
   expulsé pour flood, le robot envoie 4 lignes d'un coup, puis une ligne toutes les 2 secondes.
 - **Connexion** : quand elle tombe, le robot se reconnecte seul (après 2, 5, 10, 30 puis 60 secondes) et
   rejoint de nouveau ses salons. Un salon plein ou qui n'a pas répondu est retenté toutes les 2 minutes ;
-  après une expulsion (kick), le robot reste dehors jusqu'au prochain redémarrage ou changement de
-  configuration.
+  après une expulsion (kick), le robot reste dehors jusqu'à sa prochaine reconnexion ou un changement
+  de configuration.
 
 ## Tableau de bord
 
@@ -115,7 +115,8 @@ jamais : tous ceux qui voient le tableau de bord voient le widget.
 
 - **Envoyer un message IRC** : écrit un message à un pseudo (`alice`) ou dans un salon où se trouve le robot
   (`#maison`). Le message accepte les variables de scène. Résultats : Envoyé (oui/non), Erreur. Un message
-  qui échoue n'arrête pas la scène : testez **Envoyé** par une condition si besoin.
+  qui échoue n'arrête pas la scène : testez **Envoyé** par une condition si besoin. Un pseudo n'est pas vérifié : qui le
+  détient reçoit le message, n'envoyez donc rien de privé ainsi.
 
 Pour écrire à un utilisateur de Gladys plutôt qu'à un pseudo, utilisez l'action **Envoyer un message** de
 Gladys : elle atteint son compte IRC lié, après la vérification par WHOIS.

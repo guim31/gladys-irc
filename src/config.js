@@ -73,7 +73,9 @@ export function parseList(value) {
  * @returns {{ id: string, kind: 'account'|'mask', pattern?: RegExp } | null}
  */
 export function parseAllowed(value) {
-  const text = ircLower(trimmed(value));
+  // ASCII lower case only: servers disagree on [ ] \ ~ (Ergo tells "ab[c" from
+  // "ab{c" while announcing rfc1459), and a mismatch must refuse, never accept.
+  const text = trimmed(value).toLowerCase();
   if (HOSTMASK.test(text)) {
     const source = text
       .split('')

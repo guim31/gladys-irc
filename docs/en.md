@@ -81,7 +81,7 @@ Each Gladys user who wants to talk to Gladys from IRC does it once:
   lines at once, then one line every 2 seconds.
 - **Connection**: when it drops, the bot reconnects by itself (after 2, 5, 10, 30 then 60 seconds) and joins
   its channels again. A channel that was full or did not answer is tried again every 2 minutes; after a kick,
-  the bot stays out until the next restart or configuration change.
+  the bot stays out until it reconnects or the configuration changes.
 
 ## Dashboard
 
@@ -110,7 +110,8 @@ who sees the dashboard sees the widget.
 
 - **Send an IRC message**: writes a message to a nickname (`alice`) or in a channel the bot is in (`#home`).
   The message accepts the scene variables. Results: Sent (yes/no), Error. A failed message does not stop the
-  scene: test **Sent** with a condition if needed.
+  scene: test **Sent** with a condition if needed. A nickname is not checked: whoever holds it
+  receives the message, so send nothing private this way.
 
 To write to one Gladys user rather than to a nickname, use the **Send Message** action of Gladys: it reaches
 their linked IRC account, after the WHOIS check.

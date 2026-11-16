@@ -17,9 +17,12 @@
 
 import { EventEmitter } from 'node:events';
 import IRC from 'irc-framework';
+import { createLogger } from '@gladysassistant/integration-sdk';
 import { ircLower } from '../config.js';
 import { ERROR_KINDS, IrcError, classifyError } from './errors.js';
 import { MAX_LINE_BYTES, splitMessage } from './split.js';
+
+const logger = createLogger({ name: 'irc' });
 
 export const CONNECT_TIMEOUT_MS = 30_000;
 export const PING_TIMEOUT_MS = 15_000;
@@ -185,7 +188,9 @@ export class IrcSession extends EventEmitter {
             .slice(0, 10) || 'gladys',
         gecos: 'Gladys Assistant',
         account: auth === 'sasl' ? { account: login, password } : undefined,
-        password: auth === 'server_password' ? password : undefined,
+        // ZNC reads "user/network:password" from PASS.
+        password:
+          auth === 'server_password' ? (account ? `${account}:${password}` : password) : undefined,
         sasl_disconnect_on_fail: true,
         auto_reconnect: false,
         ping_interval: 60,
@@ -222,13 +227,16 @@ export class IrcSession extends EventEmitter {
           finish(true);
         }
       };
+      const onClose = () => finish(false);
       const finish = (ok) => {
         clearTimeout(timer);
+        client.removeListener('socket close', onClose);
         client.removeListener('loggedin', onLogin);
         client.removeListener('account', onAccount);
         client.removeListener('notice', onNotice);
         resolve(ok);
       };
+      client.on('socket close', onClose);
       client.on('loggedin', onLogin);
       client.on('account', onAccount);
       client.on('notice', onNotice);
@@ -239,6 +247,8 @@ export class IrcSession extends EventEmitter {
   bindEvents(client) {
     const self = () => ircLower(this.nick);
     client.on('privmsg', (event) => this.onMessage(event));
+    client.on('quit', (event) => this.emit('nick_gone', event.nick ?? ''));
+    client.on('nick', (event) => this.emit('nick_gone', event.nick ?? ''));
     client.on('action', (event) => this.onMessage(event)); // "/me ..."
     client.on('join', (event) => {
       if (ircLower(event.nick ?? '') === self()) {
@@ -293,8 +303,11 @@ export class IrcSession extends EventEmitter {
     if (this.closed) {
       throw new IrcError(ERROR_KINDS.UNREACHABLE, 'Not connected');
     }
-    // Room for ":nick!user@host PRIVMSG target :" and CRLF in the 512 bytes.
-    const budget = Math.min(MAX_LINE_BYTES, 512 - 2 - 100 - `PRIVMSG ${target} :`.length);
+    // Room for ":nick!user@host PRIVMSG target :" and CRLF in the 512 bytes (bytes, not characters).
+    const budget = Math.min(
+      MAX_LINE_BYTES,
+      512 - 2 - 120 - Buffer.byteLength(`PRIVMSG ${target} :`),
+    );
     const lines = splitMessage(text, { maxBytes: budget });
     if (this.queue.length + lines.length > MAX_QUEUED_LINES) {
       throw new IrcError(ERROR_KINDS.FLOOD, 'Too many messages waiting');
@@ -389,6 +402,9 @@ export class IrcSession extends EventEmitter {
     this.closeError = error;
     clearInterval(this.refill);
     this.refill = null;
+    if (this.queue.length > 0) {
+      logger.debug(`${this.queue.length} queued IRC lines dropped with the session`);
+    }
     this.queue = [];
     this.emit('closed', error);
   }
