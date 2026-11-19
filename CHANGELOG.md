@@ -9,3 +9,8 @@ workflow moves that section under the version it ships, and the section becomes
 the notes of the version's GitHub Release.
 
 ## [Unreleased]
+
+## [1.0.0] - 2026-11-19
+
+[Unreleased]: https://github.com/guim31/gladys-irc/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/guim31/gladys-irc/releases/tag/v1.0.0
